@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import Editor from '@monaco-editor/react';
+import Editor, { Monaco } from '@monaco-editor/react';
 import './index.css';
 
 const App: React.FC = () => {
@@ -13,6 +13,7 @@ const App: React.FC = () => {
   const [search, setSearch] = useState('');
   const [replace, setReplace] = useState('');
   const [newFileName, setNewFileName] = useState('');
+  const editorRef = useRef<any>(null);
 
   const checkConnection = async (inputToken: string) => {
     try {
@@ -112,17 +113,21 @@ const App: React.FC = () => {
     }
   };
 
-  const renameFile = async (oldName: string, newName: string) => {
-    if (!isConnected || !newName) return;
+  const renameFile = async () => {
+    if (!isConnected || !currentFile || !newFileName) {
+      alert('Please select a file and enter a new name');
+      return;
+    }
     try {
       const response = await fetch('/api/rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
-        body: JSON.stringify({ oldName, newName }),
+        body: JSON.stringify({ oldName: currentFile, newName: newFileName }),
       });
       if (response.ok) {
-        setFiles(files.map(f => (f === oldName ? newName : f)));
-        if (currentFile === oldName) setCurrentFile(newName);
+        setFiles(files.map(f => (f === currentFile ? newFileName : f)));
+        setCurrentFile(newFileName);
+        setNewFileName('');
       } else {
         alert('Failed to rename file');
       }
@@ -132,7 +137,10 @@ const App: React.FC = () => {
   };
 
   const createNewFile = async () => {
-    if (!isConnected || !newFileName) return;
+    if (!isConnected || !newFileName) {
+      alert('Please enter a new file name');
+      return;
+    }
     try {
       const response = await fetch('/api/file', {
         method: 'PUT',
@@ -165,6 +173,52 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSearch = () => {
+    if (!editorRef.current || !search) return;
+    const editor = editorRef.current;
+    editor.deltaDecorations([], [
+      {
+        range: new window.monaco.Range(1, 1, 1, 1),
+        options: {},
+      },
+    ]);
+    const model = editor.getModel();
+    if (!model) return;
+    const matches = model.findMatches(
+      search,
+      true,
+      false,
+      true,
+      null,
+      true
+    );
+    const decorations = matches.map(match => ({
+      range: match.range,
+      options: {
+        isWholeLine: false,
+        className: 'highlightMatch',
+      },
+    }));
+    editor.deltaDecorations([], decorations);
+    if (matches.length > 0) {
+      editor.revealRange(matches[0].range);
+    }
+  };
+
+  const handleEditorDidMount = (editor: any, monaco: Monaco) => {
+    editorRef.current = editor;
+    monaco.editor.defineTheme('customTheme', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {},
+    });
+    monaco.editor.setTheme('customTheme');
+    editor.addCommand(monaco.KeyCode.Escape, () => {
+      editor.deltaDecorations([], []);
+    });
+  };
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       <div className="w-64 bg-gray-800 p-4">
@@ -187,19 +241,9 @@ const App: React.FC = () => {
             </ul>
             <input
               type="text"
-              placeholder="New file name"
+              placeholder="New file name or rename"
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newFileName) {
-                  if (currentFile) {
-                    renameFile(currentFile, newFileName);
-                  } else {
-                    createNewFile();
-                  }
-                  setNewFileName('');
-                }
-              }}
               className="mt-2 w-full p-1 bg-gray-700 rounded"
             />
             <button
@@ -208,6 +252,14 @@ const App: React.FC = () => {
             >
               Create New File
             </button>
+            {currentFile && (
+              <button
+                onClick={renameFile}
+                className="mt-2 w-full p-2 bg-purple-500 rounded"
+              >
+                Rename File
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -227,7 +279,8 @@ const App: React.FC = () => {
             onChange={(e) => setReplace(e.target.value)}
             className="p-2 bg-gray-700 rounded mr-2"
           />
-          <button onClick={handleReplace} className="p-2 bg-blue-500 rounded">Replace</button>
+          <button onClick={handleSearch} className="p-2 bg-teal-500 rounded">Find</button>
+          <button onClick={handleReplace} className="p-2 bg-blue-500 rounded ml-2">Replace</button>
           <button onClick={saveLocally} className="p-2 bg-yellow-500 rounded ml-2">Save Locally</button>
           {isConnected && (
             <button onClick={saveToCloud} className="p-2 bg-green-500 rounded ml-2">Save to Cloud</button>
@@ -238,6 +291,7 @@ const App: React.FC = () => {
           defaultLanguage="yaml"
           value={content}
           onChange={(value) => setContent(value || '')}
+          onMount={handleEditorDidMount}
           theme="vs-dark"
         />
       </div>
@@ -268,6 +322,12 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      <style>{`
+        .highlightMatch {
+          background-color: #4CAF50;
+          color: white;
+        }
+      `}</style>
     </div>
   );
 };
