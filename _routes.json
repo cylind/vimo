@@ -2,11 +2,12 @@
   "version": 1,
   "include": [
     "/api/*",
-    "/*/*"
+    "/:token/:key"
   ],
   "exclude": [
     "/assets/*",
     "/index.html",
-    "/"
+    "/",
+    "/favicon.ico"
   ]
 }
