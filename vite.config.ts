@@ -7,9 +7,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: resolve(__dirname, 'src/index.html'),
+      input: resolve(__dirname, 'index.html'),
     },
   },
-  // 确保 publicDir 不影响输出
   publicDir: false,
 });
