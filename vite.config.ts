@@ -22,5 +22,5 @@ export default defineConfig({
       input: resolve(__dirname, 'index.html'),
     },
   },
-  publicDir: false,
+  publicDir: 'public',
 });

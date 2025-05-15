@@ -1,0 +1,3 @@
+/api/*  /api/*  200!
+/download/*  /download/*  200!
+/*  /index.html  200
