@@ -12,51 +12,72 @@ const App: React.FC = () => {
   const [content, setContent] = useState('');
   const [search, setSearch] = useState('');
   const [replace, setReplace] = useState('');
+  const [newFileName, setNewFileName] = useState('');
 
   const checkConnection = async (inputToken: string) => {
-    const response = await fetch('/api/validate-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: inputToken }),
-    });
-    const { valid } = await response.json();
-    if (valid) {
-      setIsConnected(true);
-      setToken(inputToken);
-      fetchFiles(inputToken);
-    } else {
-      alert('Invalid API token');
+    try {
+      const response = await fetch('/api/validate-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: inputToken }),
+      });
+      const { valid } = await response.json();
+      if (valid) {
+        setIsConnected(true);
+        setToken(inputToken);
+        fetchFiles(inputToken);
+      } else {
+        alert('Invalid API token');
+      }
+    } catch (error) {
+      alert('Failed to validate token');
     }
   };
 
   const fetchFiles = async (token: string) => {
-    const response = await fetch('/api/files', {
-      headers: { 'X-API-Token': token },
-    });
-    const data = await response.json();
-    if (data.files) setFiles(data.files);
+    try {
+      const response = await fetch('/api/files', {
+        headers: { 'X-API-Token': token },
+      });
+      const data = await response.json();
+      if (data.files) setFiles(data.files);
+    } catch (error) {
+      alert('Failed to fetch files');
+    }
   };
 
   const loadFile = async (file: string) => {
     if (!isConnected) return;
-    const response = await fetch(`/api/file/${file}`, {
-      headers: { 'X-API-Token': token },
-    });
-    const data = await response.json();
-    if (data.content) {
-      setContent(data.content);
-      setCurrentFile(file);
+    try {
+      const response = await fetch(`/api/file/${file}`, {
+        headers: { 'X-API-Token': token },
+      });
+      const data = await response.json();
+      if (data.content) {
+        setContent(data.content);
+        setCurrentFile(file);
+      }
+    } catch (error) {
+      alert('Failed to load file');
     }
   };
 
   const saveToCloud = async () => {
     if (!isConnected || !currentFile) return;
-    await fetch('/api/file', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
-      body: JSON.stringify({ file: currentFile, content }),
-    });
-    alert('Saved to R2');
+    try {
+      const response = await fetch('/api/file', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
+        body: JSON.stringify({ file: currentFile, content }),
+      });
+      if (response.ok) {
+        alert('Saved to R2');
+      } else {
+        alert('Failed to save to R2');
+      }
+    } catch (error) {
+      alert('Failed to save to R2');
+    }
   };
 
   const saveLocally = () => {
@@ -72,31 +93,75 @@ const App: React.FC = () => {
 
   const deleteFile = async (file: string) => {
     if (!isConnected) return;
-    await fetch(`/api/file/${file}`, {
-      method: 'DELETE',
-      headers: { 'X-API-Token': token },
-    });
-    setFiles(files.filter(f => f !== file));
-    if (currentFile === file) {
-      setCurrentFile(null);
-      setContent('');
+    try {
+      const response = await fetch(`/api/file/${file}`, {
+        method: 'DELETE',
+        headers: { 'X-API-Token': token },
+      });
+      if (response.ok) {
+        setFiles(files.filter(f => f !== file));
+        if (currentFile === file) {
+          setCurrentFile(null);
+          setContent('');
+        }
+      } else {
+        alert('Failed to delete file');
+      }
+    } catch (error) {
+      alert('Failed to delete file');
     }
   };
 
   const renameFile = async (oldName: string, newName: string) => {
-    if (!isConnected) return;
-    await fetch('/api/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
-      body: JSON.stringify({ oldName, newName }),
-    });
-    setFiles(files.map(f => f === oldName ? newName : f));
-    if (currentFile === oldName) setCurrentFile(newName);
+    if (!isConnected || !newName) return;
+    try {
+      const response = await fetch('/api/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
+        body: JSON.stringify({ oldName, newName }),
+      });
+      if (response.ok) {
+        setFiles(files.map(f => (f === oldName ? newName : f)));
+        if (currentFile === oldName) setCurrentFile(newName);
+      } else {
+        alert('Failed to rename file');
+      }
+    } catch (error) {
+      alert('Failed to rename file');
+    }
+  };
+
+  const createNewFile = async () => {
+    if (!isConnected || !newFileName) return;
+    try {
+      const response = await fetch('/api/file', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-API-Token': token },
+        body: JSON.stringify({ file: newFileName, content: '' }),
+      });
+      if (response.ok) {
+        setFiles([...files, newFileName]);
+        setCurrentFile(newFileName);
+        setContent('');
+        setNewFileName('');
+      } else {
+        alert('Failed to create new file');
+      }
+    } catch (error) {
+      alert('Failed to create new file');
+    }
   };
 
   const handleReplace = () => {
-    if (search && replace) {
-      setContent(content.replace(new RegExp(search, 'g'), replace));
+    if (!search || !replace) {
+      alert('Please enter both search and replace values');
+      return;
+    }
+    try {
+      const newContent = content.replace(new RegExp(search, 'g'), replace);
+      setContent(newContent);
+    } catch (error) {
+      alert('Invalid search pattern');
     }
   };
 
@@ -123,14 +188,26 @@ const App: React.FC = () => {
             <input
               type="text"
               placeholder="New file name"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value) {
-                  renameFile(currentFile || '', e.currentTarget.value);
-                  e.currentTarget.value = '';
+                if (e.key === 'Enter' && newFileName) {
+                  if (currentFile) {
+                    renameFile(currentFile, newFileName);
+                  } else {
+                    createNewFile();
+                  }
+                  setNewFileName('');
                 }
               }}
               className="mt-2 w-full p-1 bg-gray-700 rounded"
             />
+            <button
+              onClick={createNewFile}
+              className="mt-2 w-full p-2 bg-blue-500 rounded"
+            >
+              Create New File
+            </button>
           </div>
         )}
       </div>

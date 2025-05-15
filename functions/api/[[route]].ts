@@ -72,6 +72,7 @@ app.get('/:token/:key', async (c) => {
   const object = await c.env.CONFIG_BUCKET.get(key);
   if (!object) return c.json({ error: 'File not found' }, 404);
   return c.body(await object.text(), 200, {
+    'Content-Type': 'text/plain',
     'Content-Disposition': `attachment; filename="${key}"`,
   });
 });
